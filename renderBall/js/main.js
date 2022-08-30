@@ -142,23 +142,23 @@ window.onload = () => {
   window.requestAnimationFrame(renderImage);
 };
 
-// function renderImage() {
-//   angle += 1;
-//   let x = Math.cos((angle / 180) * Math.PI) * 15;
-//   let y = Math.sin((angle / 180) * Math.PI) * 15;
-//   // let center = new Vector3(-2 / Math.sqrt(3), 0, 0)
-//   let center = new Vector3(0, 0, 0);
-//   let pos = new Vector3(x, y, 20);
-//   pos.add(center);
-//   // console.log(pos);
-//   // let pos = new Vector3(-10,0,5)
-//   let dir = center.sub(pos, true);
-//   dir.normalize();
-//   render.camera.pos = pos;
-//   render.camera.forward = dir;
-//   render.startRender();
-//   window.requestAnimationFrame(renderImage);
-// }
+function renderImage() {
+  angle += 1;
+  let x = Math.cos((angle / 180) * Math.PI) * 15;
+  let y = Math.sin((angle / 180) * Math.PI) * 15;
+  // let center = new Vector3(-2 / Math.sqrt(3), 0, 0)
+  let center = new Vector3(0, 0, 0);
+  let pos = new Vector3(x, y, 20);
+  pos.add(center);
+  // console.log(pos);
+  // let pos = new Vector3(-10,0,5)
+  let dir = center.sub(pos, true);
+  dir.normalize();
+  render.camera.pos = pos;
+  render.camera.forward = dir;
+  render.startRender();
+  window.requestAnimationFrame(renderImage);
+}
 let mouseControll = false;
 let viewAngle = {
   pitch: -50,
@@ -177,13 +177,13 @@ function angleToDir(angle) {
   return new Vector3(x, y, z);
 }
 
-function renderImage() {
-  let dir = angleToDir(viewAngle);
-  dir.normalize();
-  render.camera.forward = dir;
-  render.startRender();
-  window.requestAnimationFrame(renderImage);
-}
+// function renderImage() {
+//   let dir = angleToDir(viewAngle);
+//   dir.normalize();
+//   render.camera.forward = dir;
+//   render.startRender();
+//   window.requestAnimationFrame(renderImage);
+// }
 
 function getBox(pos, _size, materialData) {
   let size = _size.dev(2, true);
