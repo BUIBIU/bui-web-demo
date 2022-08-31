@@ -5,6 +5,24 @@ body {
     margin: 0px;
     padding: 0px;
 }
-body{
+
+body {
     background-color: white;
+}
+
+.test_cbue {
+    width: 200px;
+    height: 200px;
+    background: black;
+    animation: roll 1s infinite linear;
+}
+
+@keyframes roll {
+    0% {
+        transform: rotateZ(0deg);
+    }
+
+    100% {
+        transform: rotateZ(360deg);
+    }
 }
