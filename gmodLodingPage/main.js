@@ -7,12 +7,12 @@ function GameDetails(servername, serverurl, mapname, maxplayers, steamid, gamemo
 }
 function SetFilesTotal(total) {
     let div = document.createElement('div')
-    div.innerText = total + " files"
+    div.innerText = total + " total files"
     document.body.append(div)
 }
 function SetFilesNeeded(needed) {
     let div = document.createElement('div')
-    div.innerText = needed + " files"
+    div.innerText = needed + " files need"
     document.body.append(div)
 }
 function DownloadingFile(fileName) {
