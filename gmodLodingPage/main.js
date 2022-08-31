@@ -26,6 +26,8 @@ function SetStatusChanged(status) {
     document.body.append(div)
 }
 window.onload = function () {
-
+    let div = document.createElement('div')
+    div.innerText = navigator.userAgent
+    document.body.append(div)
 
 }
