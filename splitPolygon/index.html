@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+<style>
+  html,
+  body {
+    width: 100%;
+    height: 100%;
+    padding: 0px;
+    margin: 0px;
+  }
+
+  #canvas {
+    height: 100%;
+    width: 100%;
+    display: block;
+  }
+</style>
+
+<body>
+  <canvas id="canvas"></canvas>
+</body>
+<script>
+  class Vec2 {
+    constructor(x = 0, y = 0) {
+      this.x = x;
+      this.y = y;
+    }
+    add(v) {
+      return new Vec2(this.x + v.x, this.y + v.y);
+    }
+    sub(v) {
+      return new Vec2(this.x - v.x, this.y - v.y);
+    }
+    mul(n) {
+      return new Vec2(this.x * n, this.y * n);
+    }
+    div(n) {
+      return new Vec2(this.x / n, this.y / n);
+    }
+    length() {
+      return Math.sqrt(this.x ** 2 + this.y ** 2);
+    }
+    lengthSqr() {
+      return this.x ** 2 + this.y ** 2;
+    }
+    normalized() {
+      return this.div(this.length());
+    }
+    clone() {
+      return new Vec2(this.x, this.y);
+    }
+    static dot(v1, v2) {
+      return v1.x * v2.x + v1.y * v2.y;
+    }
+    static angle2Vec(angle) {
+      const a = (angle / 180) * Math.PI;
+      return new Vec2(Math.cos(a), Math.sin(a));
+    }
+    static cross(v1, v2) {
+      return v1.x * v2.y - v2.x * v1.y;
+    }
+    static isCross(pos, vec, p1, p2) {
+      const v1 = p1.sub(pos);
+      const v2 = p2.sub(pos);
+      const n = Vec2.cross(vec, v1) * Vec2.cross(vec, v2);
+      return n < 0;
+    }
+    static isCrossTowLine(start1, end1, start2, end2) {
+      const v1 = start2.sub(start1);
+      const v2 = end2.sub(start1);
+      const v3 = start1.sub(start2);
+      const v4 = end1.sub(start2);
+      const v5 = end1.sub(start1);
+      const v6 = end2.sub(start2);
+      const n1 = Vec2.cross(v5, v1) * Vec2.cross(v5, v2);
+      const n2 = Vec2.cross(v6, v3) * Vec2.cross(v6, v4);
+      return n1 < 0 && n2 < 0;
+    }
+    static toLocal(pos, targetPos, up) {
+      const v = pos.sub(targetPos);
+      return Vec2.toLocalAxis(v, up);
+    }
+    static toLocalAxis(axis, up) {
+      const right = new Vec2(-up.y, up.x);
+      const localRight = Vec2.dot(axis, right);
+      const localUp = Vec2.dot(axis, up);
+      return new Vec2(localRight, localUp);
+    }
+    static toWorld(pos, targetPos, up) {
+      return targetPos.add(Vec2.toWorldAxis(pos, up));
+    }
+    static toWorldAxis(axis, up) {
+      const right = new Vec2(-up.y, up.x);
+      const worldRight = right.mul(axis.x);
+      const worldUp = up.mul(axis.y);
+      return worldRight.add(worldUp);
+    }
+    static getCrossPoint(p1, v1, p2, v2) {
+      const nv1 = v1.normalized();
+      const nv2 = v2.normalized();
+      const hv2 = new Vec2(-nv2.y, nv2.x);
+      const v3 = p2.sub(p1);
+      const h = Vec2.dot(hv2, v3);
+      const dot = Vec2.dot(nv1, hv2);
+      const l = h / dot;
+      return p1.add(nv1.mul(l));
+    }
+  }
+  class Node {
+    constructor(pos = new Vec2(0, 0)) {
+      this.pos = pos;
+      this.next = null;
+    }
+  }
+  class Polygon {
+    constructor() {
+      this.angle = 0;
+      this.angleVel = 0;
+      this.pos = new Vec2(0, 0);
+      this.nodes = [];
+      this.up = null;
+      this.right = null;
+      this.vel = new Vec2(0, 0);
+      this.setAngle(this.angle);
+      this.color = `hsl(${(360 * Math.random()) | 0}, 100%, 50%)`;
+      this.father = true;
+    }
+    setAngle(angle) {
+      this.angle = angle;
+      this.up = this.getUp();
+      this.right = this.getRight();
+    }
+    getUp() {
+      return Vec2.angle2Vec(this.angle - 90);
+    }
+    getRight() {
+      return Vec2.angle2Vec(this.angle);
+    }
+  /** * * @param {CanvasRenderingContext2D} ctx * */ draw(ctx) {
+      if (this.nodes.length < 2) {
+        return;
+      }
+      ctx.beginPath();
+      ctx.strokeStyle = 'black';
+      ctx.fillStyle = this.color;
+      ctx.lineCap = 'round';
+      let firstNode = this.nodes[0];
+      let node = firstNode;
+      do {
+        const localPos = node.pos;
+        const offsetPos = this.up.mul(localPos.y).add(this.right.mul(localPos.x));
+        const worldPos = this.pos.add(offsetPos);
+        if (firstNode === node) {
+          ctx.moveTo(worldPos.x, worldPos.y);
+        } else {
+          ctx.lineTo(worldPos.x, worldPos.y);
+        }
+        node = node.next;
+      } while (node !== firstNode);
+      ctx.closePath();
+      ctx.fill();
+    }
+    setStartNode(startNode) {
+      let node = startNode;
+      let centerPoint = new Vec2(0, 0);
+      let nodes = [];
+      do {
+        centerPoint = centerPoint.add(node.pos);
+        nodes.push(node);
+        node = node.next;
+      } while (node !== startNode);
+      this.nodes = nodes;
+      const pos = centerPoint.div(nodes.length);
+      nodes.forEach((node) => {
+        node.pos = node.pos.sub(pos);
+      });
+      this.pos = Vec2.toWorld(pos, this.pos, this.up);
+    }
+    move() {
+      this.pos = this.pos.add(this.vel);
+      this.setAngle(this.angle + this.angleVel);
+    }
+  }
+  class Cube extends Polygon {
+    constructor(size = 10, pos = null, angle = 0, vel = null, angleVel = 0) {
+      super();
+      this.size = size;
+      this.angle = angle;
+      this.pos = pos || new Vec2(0, 0);
+      this.vel = vel || new Vec2(0, 0);
+      this.angleVel = angleVel;
+      this.init();
+    }
+    init() {
+      const halfSize = this.size / 2;
+      const n1 = new Node(new Vec2(-halfSize, -halfSize));
+      const n2 = new Node(new Vec2(halfSize, -halfSize));
+      const n3 = new Node(new Vec2(halfSize, halfSize));
+      const n4 = new Node(new Vec2(-halfSize, halfSize));
+      n1.next = n2;
+      n2.next = n3;
+      n3.next = n4;
+      n4.next = n1;
+      this.setStartNode(n1);
+    }
+  }
+  class ClipPolygon {
+  /** * @param {HTMLCanvasElement} canvas */ constructor(canvas) {
+      this.canvas = canvas;
+      canvas.width = canvas.clientWidth;
+      canvas.height = canvas.clientHeight;
+      this.ctx = canvas.getContext('2d');
+      this.polygons = [];
+      this.cliping = false;
+      this.clipStart = null;
+      this.clipEnd = null;
+      canvas.addEventListener('mousedown', (e) => {
+        const mousePos = this.getMousePos(e.offsetX, e.offsetY);
+        if (e.button === 0) {
+          this.cliping = true;
+          this.clipStart = mousePos;
+          this.clipEnd = mousePos;
+        }
+        if (e.button === 2) {
+          this.clip(
+            new Vec2(mousePos.x, mousePos.y),
+            Vec2.angle2Vec(360 * Math.random())
+          );
+        }
+      });
+      canvas.addEventListener('wheel', (e) => {
+        const mousePos = this.getMousePos(e.offsetX, e.offsetY);
+        this.clip(
+          new Vec2(mousePos.x, mousePos.y),
+          Vec2.angle2Vec(360 * Math.random())
+        );
+      });
+      canvas.addEventListener('mousemove', (e) => {
+        if (this.cliping) {
+          const mousePos = this.getMousePos(e.offsetX, e.offsetY);
+          this.clipEnd = mousePos;
+        }
+      });
+      canvas.addEventListener('mouseup', (e) => {
+        if (this.cliping) {
+          this.cliping = false;
+          const mousePos = this.getMousePos(e.offsetX, e.offsetY);
+          this.clipEnd = mousePos;
+        }
+        this.clip2(
+          new Vec2(this.clipStart.x, this.clipStart.y),
+          new Vec2(this.clipEnd.x, this.clipEnd.y)
+        );
+      });
+      canvas.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+      });
+    }
+    draw() {
+      const ctx = this.ctx;
+      ctx.fillStyle = 'black';
+      ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+      this.polygons.forEach((polygon) => {
+        polygon.draw(ctx);
+      });
+      if (this.cliping) {
+        ctx.beginPath();
+        ctx.strokeStyle = 'white';
+        ctx.moveTo(this.clipStart.x, this.clipStart.y);
+        ctx.lineTo(this.clipEnd.x, this.clipEnd.y);
+        ctx.stroke();
+      }
+    }
+    clip(clipPos, clipVec) {
+      this.polygons.forEach((polygon) => {
+        this.clipPolygon(clipPos, clipVec, polygon);
+      });
+    }
+    clip2(start, end) {
+      this.polygons.forEach((polygon) => {
+        this.clipPolygon2(start, end, polygon);
+      });
+    }
+    clipPolygon(clipPos, clipVec, polygon) {
+      const up = polygon.up;
+      const localStart = Vec2.toLocal(clipPos, polygon.pos, up);
+      const localVec = Vec2.toLocalAxis(clipVec, up);
+      const nodes = polygon.nodes;
+      let firstNode = nodes[0];
+      let node = firstNode;
+      const crossLines = [];
+      do {
+        const p1 = node.pos;
+        const p2 = node.next.pos;
+        if (Vec2.isCross(localStart, localVec, p1, p2)) {
+          crossLines.push(node);
+        }
+        node = node.next;
+      } while (node !== firstNode);
+      if (crossLines.length > 0) {
+        if (crossLines.length !== 2) {
+          return;
+        }
+        let lineStart1 = crossLines[0];
+        let lineStart2 = crossLines[1];
+        let p1 = lineStart1.pos;
+        let p2 = lineStart1.next.pos;
+        const corssPoint1 = Vec2.getCrossPoint(
+          localStart,
+          localVec,
+          p1,
+          p2.sub(p1)
+        );
+        p1 = lineStart2.pos;
+        p2 = lineStart2.next.pos;
+        const corssPoint2 = Vec2.getCrossPoint(
+          localStart,
+          localVec,
+          p1,
+          p2.sub(p1)
+        );
+        const clipPoint1 = new Node(corssPoint1.clone());
+        const clipPoint2 = new Node(corssPoint1.clone());
+        clipPoint2.next = lineStart1.next;
+        lineStart1.next = clipPoint1;
+        const clipPoint3 = new Node(corssPoint2.clone());
+        const clipPoint4 = new Node(corssPoint2.clone());
+        clipPoint4.next = lineStart2.next;
+        lineStart2.next = clipPoint3;
+        clipPoint1.next = clipPoint4;
+        clipPoint3.next = clipPoint2;
+        const clonePolygon = new Polygon();
+        clonePolygon.pos = polygon.pos.clone();
+        clonePolygon.vel = polygon.vel.clone();
+        clonePolygon.setAngle(polygon.angle);
+        clonePolygon.angleVel = polygon.angleVel;
+        clonePolygon.setStartNode(clipPoint2);
+        clonePolygon.color = polygon.color;
+        clonePolygon.father = false;
+        polygon.father = false;
+        polygon.setStartNode(clipPoint1);
+        this.polygons.push(clonePolygon);
+        ClipPolygon.applyForce([polygon, clonePolygon], clipPos, clipVec);
+      }
+    }
+    clipPolygon2(start, end, polygon) {
+      const up = polygon.up;
+      const localStart = Vec2.toLocal(start, polygon.pos, up);
+      const localEnd = Vec2.toLocal(end, polygon.pos, up);
+      const localVec = localEnd.sub(localStart);
+      const nodes = polygon.nodes;
+      let firstNode = nodes[0];
+      let node = firstNode;
+      const crossLines = [];
+      do {
+        const p1 = node.pos;
+        const p2 = node.next.pos;
+        if (Vec2.isCrossTowLine(localStart, localEnd, p1, p2)) {
+          crossLines.push(node);
+        }
+        node = node.next;
+      } while (node !== firstNode);
+      if (crossLines.length > 0) {
+        if (crossLines.length !== 2) {
+          return;
+        }
+        let lineStart1 = crossLines[0];
+        let lineStart2 = crossLines[1];
+        let p1 = lineStart1.pos;
+        let p2 = lineStart1.next.pos;
+        const corssPoint1 = Vec2.getCrossPoint(
+          localStart,
+          localVec,
+          p1,
+          p2.sub(p1)
+        );
+        p1 = lineStart2.pos;
+        p2 = lineStart2.next.pos;
+        const corssPoint2 = Vec2.getCrossPoint(
+          localStart,
+          localVec,
+          p1,
+          p2.sub(p1)
+        );
+        const clipPoint1 = new Node(corssPoint1.clone());
+        const clipPoint2 = new Node(corssPoint1.clone());
+        clipPoint2.next = lineStart1.next;
+        lineStart1.next = clipPoint1;
+        const clipPoint3 = new Node(corssPoint2.clone());
+        const clipPoint4 = new Node(corssPoint2.clone());
+        clipPoint4.next = lineStart2.next;
+        lineStart2.next = clipPoint3;
+        clipPoint1.next = clipPoint4;
+        clipPoint3.next = clipPoint2;
+        const clonePolygon = new Polygon();
+        clonePolygon.pos = polygon.pos.clone();
+        clonePolygon.vel = polygon.vel.clone();
+        clonePolygon.setAngle(polygon.angle);
+        clonePolygon.angleVel = polygon.angleVel;
+        clonePolygon.setStartNode(clipPoint2);
+        clonePolygon.color = polygon.color;
+        clonePolygon.father = false;
+        polygon.father = false;
+        polygon.setStartNode(clipPoint1);
+        this.polygons.push(clonePolygon);
+        ClipPolygon.applyForce([polygon, clonePolygon], start, end.sub(start));
+      }
+    }
+    doClip(polygon, line1, pos1, line2, pos2) { }
+    tick(time) {
+      console.log(time);
+      if (this.polygons.filter((item) => item.father).length < 5) {
+        const size = 70 + Math.random() * 70;
+        const x = this.canvas.width * (0.25 + Math.random() * 0.5);
+        const pos = new Vec2(x, this.canvas.height * 1.2);
+        const vel = Vec2.angle2Vec(-120 + Math.random() * 60).mul(8);
+        const angleVel = Math.random() * 2 - 1;
+        const cube1 = new Cube(size, pos, 0, vel, angleVel);
+        this.polygons.push(cube1);
+      }
+      this.polygons.forEach((polygon) => {
+        polygon.vel = polygon.vel.add(new Vec2(0, 0.005 * time));
+        polygon.move();
+      });
+      this.polygons = this.polygons.filter((polygon) => {
+        return polygon.pos.y < this.canvas.height * 1.5;
+      });
+      this.draw();
+    }
+    static applyForce(polygons, pos, vec) {
+      const forceVec = new Vec2(-vec.y, vec.x).normalized().mul(0.2);
+      polygons.forEach((polygon) => {
+        const v = polygon.pos.sub(pos);
+        const dis = Math.sign(Vec2.cross(vec, v)) * 5;
+        const force = forceVec.mul(dis);
+        polygon.vel = polygon.vel.add(force);
+        polygon.angleVel = polygon.angleVel + 0.2 * dis;
+      });
+    }
+    getMousePos(x, y) {
+      const clientWidth = this.canvas.clientWidth;
+      const clientHeight = this.canvas.clientHeight;
+      const pixelWidth = this.canvas.width;
+      const pixelHeight = this.canvas.height;
+      const realX = (x / clientWidth) * pixelWidth;
+      const realY = (y / clientHeight) * pixelHeight;
+      return {
+        x: realX,
+        y: realY,
+      };
+    }
+  }
+  const canvas = document.getElementById('canvas');
+  const cutPolygon = new ClipPolygon(canvas);
+  let lastTime = 0
+  function tick(time = 0) {
+    const tickTime = time - lastTime;
+    lastTime = time
+    console.log(tickTime);
+    cutPolygon.tick(tickTime);
+    window.requestAnimationFrame(tick);
+  }
+  tick();
+
+</script>
+
+</html>
