@@ -183,9 +183,9 @@
       });
       this.pos = Vec2.toWorld(pos, this.pos, this.up);
     }
-    move() {
-      this.pos = this.pos.add(this.vel);
-      this.setAngle(this.angle + this.angleVel);
+    move(time) {
+      this.pos = this.pos.add(this.vel.mul(time));
+      this.setAngle(this.angle + this.angleVel * time);
     }
   }
   class Cube extends Polygon {
@@ -415,19 +415,18 @@
     }
     doClip(polygon, line1, pos1, line2, pos2) { }
     tick(time) {
-      console.log(time);
       if (this.polygons.filter((item) => item.father).length < 5) {
         const size = 70 + Math.random() * 70;
         const x = this.canvas.width * (0.25 + Math.random() * 0.5);
         const pos = new Vec2(x, this.canvas.height * 1.2);
-        const vel = Vec2.angle2Vec(-120 + Math.random() * 60).mul(8);
-        const angleVel = Math.random() * 2 - 1;
+        const vel = Vec2.angle2Vec(-120 + Math.random() * 60).mul(1.3);
+        const angleVel = (Math.random() * 2 - 1) * 0.2;
         const cube1 = new Cube(size, pos, 0, vel, angleVel);
         this.polygons.push(cube1);
       }
       this.polygons.forEach((polygon) => {
-        polygon.vel = polygon.vel.add(new Vec2(0, 0.005 * time));
-        polygon.move();
+        polygon.vel = polygon.vel.add(new Vec2(0, 0.001 * time));
+        polygon.move(time);
       });
       this.polygons = this.polygons.filter((polygon) => {
         return polygon.pos.y < this.canvas.height * 1.5;
@@ -435,13 +434,13 @@
       this.draw();
     }
     static applyForce(polygons, pos, vec) {
-      const forceVec = new Vec2(-vec.y, vec.x).normalized().mul(0.2);
+      const forceVec = new Vec2(-vec.y, vec.x).normalized().mul(0.05);
       polygons.forEach((polygon) => {
         const v = polygon.pos.sub(pos);
         const dis = Math.sign(Vec2.cross(vec, v)) * 5;
         const force = forceVec.mul(dis);
         polygon.vel = polygon.vel.add(force);
-        polygon.angleVel = polygon.angleVel + 0.2 * dis;
+        polygon.angleVel = polygon.angleVel + 0.01 * dis;
       });
     }
     getMousePos(x, y) {
